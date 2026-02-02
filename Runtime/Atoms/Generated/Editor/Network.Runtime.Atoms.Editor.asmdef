@@ -1,0 +1,23 @@
+{
+    "name": "Network.Runtime.Atoms.Editor",
+    "rootNamespace": "Network",
+    "references": [
+        "GUID:aeb2f07fa32afa44895c8986372ca605",
+        "GUID:7c88a4a7926ee5145ad2dfa06f454c67",
+        "GUID:29492541a59d04a81b47a7f225e8a22d",
+        "GUID:598750ec792e4472396f5fbc092caa65",
+        "GUID:14165214884ae4a619bfb290f28194a7",
+        "GUID:87264ae76e36244ae9adf5b5fbf7ca19"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
