@@ -52,6 +52,9 @@ namespace Network
         [Header("References")]
 
         [SerializeField]
+        private ConnectionPhaseVariable connectionPhase;
+
+        [SerializeField]
         private NetworkStateReference networkState;
 
         [SerializeField]
@@ -97,8 +100,6 @@ namespace Network
         private Coroutine offlineFallbackCoroutine;
 
         #endregion
-
-        public ConnectionPhase connectionPhase { get; private set; } = ConnectionPhase.Offline;
 
         public NetworkState NetworkState => networkState.Value;
         public LocalConnectionState ServerConnectionState => serverConnectionState.Value;
@@ -235,12 +236,12 @@ namespace Network
             parrelSyncLocalConnection?.StopHost();
             onlineConnection?.StopHost();
 
-            connectionPhase = ConnectionPhase.Offline;
+            connectionPhase.Value = ConnectionPhase.Offline;
 
             networkState.Value = NetworkState.None;
             Debug.Log("Connection Toggle - Network connection ended.");
 
-            onConnectionPhaseChanged?.Invoke(connectionPhase);
+            onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
         }
 
         private IEnumerator DoGoOnline(bool asHost)
@@ -295,19 +296,19 @@ namespace Network
             }
 
             if (asHost)
-                connectionPhase = ConnectionPhase.StartingHost;
+                connectionPhase.Value = ConnectionPhase.StartingHost;
             else if (asServer)
-                connectionPhase = ConnectionPhase.StartingServer;
+                connectionPhase.Value = ConnectionPhase.StartingServer;
             else
-                connectionPhase = ConnectionPhase.StartingClient;
+                connectionPhase.Value = ConnectionPhase.StartingClient;
 
-            onConnectionPhaseChanged?.Invoke(connectionPhase);
+            onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
 
             // If starting as client, run a retry loop before proceeding.
             if (startAsClient && targetConnection != null)
             {
                 int attempts = 0;
-                while (networkState.Value == NetworkState.Online && connectionPhase == ConnectionPhase.StartingClient)
+                while (networkState.Value == NetworkState.Online && connectionPhase.Value == ConnectionPhase.StartingClient)
                 {
                     attempts++;
 
@@ -327,7 +328,7 @@ namespace Network
                     targetConnection.StartClient();
 
                     // Wait until either started or failed back to stopped.
-                    while (networkState.Value == NetworkState.Online && connectionPhase == ConnectionPhase.StartingClient)
+                    while (networkState.Value == NetworkState.Online && connectionPhase.Value == ConnectionPhase.StartingClient)
                     {
                         var s = clientConnectionState.Value;
                         if (s == LocalConnectionState.Started)
@@ -343,7 +344,7 @@ namespace Network
                     {
                         // Wait for a short moment to ensure connection is stable
                         float connectionStartedDelay = 0f;
-                        while (connectionStartedDelay < 1f && networkState.Value == NetworkState.Online && connectionPhase == ConnectionPhase.StartingClient && clientConnectionState.Value == LocalConnectionState.Started)
+                        while (connectionStartedDelay < 1f && networkState.Value == NetworkState.Online && connectionPhase.Value == ConnectionPhase.StartingClient && clientConnectionState.Value == LocalConnectionState.Started)
                         {
                             connectionStartedDelay += Time.unscaledDeltaTime;
                             yield return null;
@@ -367,7 +368,7 @@ namespace Network
                     float t = 0f;
                     while (t < onlineConnectionRetryDelay &&
                            networkState.Value == NetworkState.Online &&
-                           connectionPhase == ConnectionPhase.StartingClient &&
+                           connectionPhase.Value == ConnectionPhase.StartingClient &&
                            clientConnectionState.Value != LocalConnectionState.Started)
                     {
                         t += Time.unscaledDeltaTime;
@@ -390,21 +391,21 @@ namespace Network
             }
 
             while (networkState.Value == NetworkState.Online &&
-                   (connectionPhase == ConnectionPhase.StartingClient && clientConnectionState.Value != LocalConnectionState.Started ||
-                    connectionPhase == ConnectionPhase.StartingServer && serverConnectionState.Value != LocalConnectionState.Started ||
-                    connectionPhase == ConnectionPhase.StartingHost && (serverConnectionState.Value != LocalConnectionState.Started || clientConnectionState.Value != LocalConnectionState.Started)))
+                   (connectionPhase.Value == ConnectionPhase.StartingClient && clientConnectionState.Value != LocalConnectionState.Started ||
+                    connectionPhase.Value == ConnectionPhase.StartingServer && serverConnectionState.Value != LocalConnectionState.Started ||
+                    connectionPhase.Value == ConnectionPhase.StartingHost && (serverConnectionState.Value != LocalConnectionState.Started || clientConnectionState.Value != LocalConnectionState.Started)))
             {
                 yield return null;
             }
 
             if (asHost)
-                connectionPhase = ConnectionPhase.OnlineAsHost;
+                connectionPhase.Value = ConnectionPhase.OnlineAsHost;
             else if (asServer)
-                connectionPhase = ConnectionPhase.OnlineAsServer;
+                connectionPhase.Value = ConnectionPhase.OnlineAsServer;
             else
-                connectionPhase = ConnectionPhase.OnlineAsClient;
+                connectionPhase.Value = ConnectionPhase.OnlineAsClient;
 
-            onConnectionPhaseChanged?.Invoke(connectionPhase);
+            onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
 
             if (fallbackToOfflineIfOnlineConnectionFails && !asHost && !asServer && offlineFallbackCoroutine == null)
             {
@@ -416,16 +417,16 @@ namespace Network
 
         private IEnumerator DoGoOffline()
         {
-            switch (connectionPhase)
+            switch (connectionPhase.Value)
             {
                 case ConnectionPhase.OnlineAsHost:
-                    connectionPhase = ConnectionPhase.StoppingHost;
+                    connectionPhase.Value = ConnectionPhase.StoppingHost;
                     break;
                 case ConnectionPhase.OnlineAsServer:
-                    connectionPhase = ConnectionPhase.StoppingServer;
+                    connectionPhase.Value = ConnectionPhase.StoppingServer;
                     break;
                 case ConnectionPhase.OnlineAsClient:
-                    connectionPhase = ConnectionPhase.StoppingClient;
+                    connectionPhase.Value = ConnectionPhase.StoppingClient;
                     break;
             }
 
@@ -449,7 +450,7 @@ namespace Network
 
             yield return null;
 
-            connectionPhase = ConnectionPhase.Offline;
+            connectionPhase.Value = ConnectionPhase.Offline;
 
             networkState.Value = NetworkState.Offline;
 
@@ -457,7 +458,7 @@ namespace Network
 
             onNetworkOffline?.Invoke();
 
-            onConnectionPhaseChanged?.Invoke(connectionPhase);
+            onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
 
             // If this is a dedicated server (or parrel sync server), we dont want to start any connections for offline mode
             var startOfflineConnection = true;
