@@ -16,6 +16,7 @@ namespace Network
     [CreateAssetMenu(fileName = "Connection Toggle_ New", menuName = "Behaviors/Connection Toggle")]
     public class ConnectionToggleBehaviour : ManagedObject
     {
+        [System.Serializable]
         public enum ConnectionPhase
         {
             Offline,
