@@ -13,7 +13,7 @@ namespace UnityAtoms.BaseAtoms
     {
         protected override bool ValueEquals(Network.ConnectionToggleBehaviour.ConnectionPhase other)
         {
-            throw new NotImplementedException();
+            return Value == other;
         }
     }
 }
