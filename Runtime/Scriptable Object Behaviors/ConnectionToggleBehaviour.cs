@@ -19,6 +19,7 @@ namespace Network
         [System.Serializable]
         public enum ConnectionPhase
         {
+            None,
             Offline,
             StartingServer,
             StartingClient,
@@ -237,7 +238,7 @@ namespace Network
             parrelSyncLocalConnection?.StopHost();
             onlineConnection?.StopHost();
 
-            connectionPhase.Value = ConnectionPhase.Offline;
+            connectionPhase.Value = ConnectionPhase.None;
 
             networkState.Value = NetworkState.None;
             Debug.Log("Connection Toggle - Network connection ended.");

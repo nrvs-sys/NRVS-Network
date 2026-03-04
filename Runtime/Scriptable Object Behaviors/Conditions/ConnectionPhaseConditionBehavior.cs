@@ -8,14 +8,14 @@ namespace NRVS.Network
 {
 
     [CreateAssetMenu(fileName = "Condition_ Connection Phase_ New", menuName = "Behaviors/Conditions/Network/Connection Phase")]
-    public class ConnectionPhaseConditionBehavior : ConditionBehavior
+    public class ConnectionPhaseConditionBehavior : ConditionBehavior<ConnectionPhaseVariable>
     {
-        [SerializeField]
-        ConnectionPhaseReference connectionPhaseReference;
-
         [SerializeField]
         ConnectionToggleBehaviour.ConnectionPhase value;
 
-        protected override bool Evaluate() => connectionPhaseReference.Value == value;
+        protected override bool Evaluate(ConnectionPhaseVariable value)
+        {
+            return value.Value == this.value;
+        }
     }
 }
