@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   FullQualifiedName: Network.ConnectionToggleBehaviour+ConnectionPhase, NRVS.Network.Runtime,
     Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
-  GenerationOptions: 3081784
+  GenerationOptions: 3098297
   Scripts:
   - {fileID: 0}
   - {fileID: 0}
