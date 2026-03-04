@@ -7,7 +7,7 @@ using UnityEngine;
 namespace NRVS.Network
 {
 
-    [CreateAssetMenu(fileName = "Condition_ Condition Phase_ New", menuName = "Behaviors/Conditions/Network/Connection Phase")]
+    [CreateAssetMenu(fileName = "Condition_ Connection Phase_ New", menuName = "Behaviors/Conditions/Network/Connection Phase")]
     public class ConnectionPhaseConditionBehavior : ConditionBehavior
     {
         [SerializeField]
