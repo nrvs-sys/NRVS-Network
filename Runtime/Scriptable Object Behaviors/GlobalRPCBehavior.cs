@@ -13,7 +13,7 @@ namespace Network
 
         protected override void Execute()
         {
-            if (Ref.TryGet(out RPCManager rpcManager))
+            if (Ref.TryGet(out GlobalRPC rpcManager))
             {
                 if (!rpcManager.isInitialized)
                     Debug.LogWarning("RPCManager is not initialized. Ensure it is before calling Global Rpcs.");

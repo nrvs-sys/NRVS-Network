@@ -8,9 +8,9 @@ using UnityEngine.Events;
 namespace Network
 {
     /// <summary>
-    /// Utility class for receiving RPC method calls from the RPC Manager, based on a specified key.
+    /// Utility class for receiving RPC method calls from the Global RPC Utility, based on a specified key.
     /// </summary>
-    public class RPCManagerUtility : MonoBehaviour
+    public class GlobalRPCUtility : MonoBehaviour
     {
         [SerializeField]
         StringReference methodKey;
@@ -22,8 +22,8 @@ namespace Network
             Ref.Instance.OnRegistered += Ref_OnRegistered;
             Ref.Instance.OnUnregistered += Ref_OnUnregistered;
 
-            if (Ref.TryGet(out RPCManager rpcManager))
-                Ref_OnRegistered(typeof(RPCManager), rpcManager);
+            if (Ref.TryGet(out GlobalRPC rpcManager))
+                Ref_OnRegistered(typeof(GlobalRPC), rpcManager);
         }
 
         void OnDisable()
@@ -31,8 +31,8 @@ namespace Network
             Ref.Instance.OnRegistered -= Ref_OnRegistered;
             Ref.Instance.OnUnregistered -= Ref_OnUnregistered;
 
-            if (Ref.TryGet(out RPCManager rpcManager))
-                Ref_OnUnregistered(typeof(RPCManager), rpcManager);
+            if (Ref.TryGet(out GlobalRPC rpcManager))
+                Ref_OnUnregistered(typeof(GlobalRPC), rpcManager);
         }
 
         void Invoke()
@@ -42,9 +42,9 @@ namespace Network
 
         void Ref_OnRegistered(Type type, object instance)
         {
-            if (type == typeof(RPCManager))
+            if (type == typeof(GlobalRPC))
             {
-                if (instance is RPCManager rpcManager)
+                if (instance is GlobalRPC rpcManager)
                 {
                     if (rpcManager.GetComponent<RPCUtility>().methods.TryGetValue(methodKey, out RPCUtility.RPCDefinition definition))
                     {
@@ -64,9 +64,9 @@ namespace Network
 
         void Ref_OnUnregistered(Type type, object instance)
         {
-            if (type == typeof(RPCManager))
+            if (type == typeof(GlobalRPC))
             {
-                if (instance is RPCManager rpcManager)
+                if (instance is GlobalRPC rpcManager)
                 {
                     if (rpcManager.GetComponent<RPCUtility>().methods.TryGetValue(methodKey, out RPCUtility.RPCDefinition definition))
                     {

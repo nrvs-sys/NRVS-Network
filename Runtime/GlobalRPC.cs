@@ -7,9 +7,9 @@ using UnityEngine;
 namespace Network
 {
     /// <summary>
-    /// Unified RPC manager that handles calling RPC methods based on the provided keys.
+    /// Unified Global RPC handler. calls RPC methods based on the provided keys.
     /// </summary>
-    public class RPCManager : MonoBehaviour
+    public class GlobalRPC : MonoBehaviour
     {
         public bool isInitialized => rpcUtility != null && (rpcUtility.IsClientInitialized || rpcUtility.IsServerInitialized);
 
@@ -24,12 +24,12 @@ namespace Network
                 Debug.LogError("RPCUtility component is missing on the GameObject. Please add it to use RPC Manager.");
             }
 
-            Ref.Register<RPCManager>(this);
+            Ref.Register<GlobalRPC>(this);
         }
 
         void OnDestroy()
         {
-            Ref.Unregister<RPCManager>(this);
+            Ref.Unregister<GlobalRPC>(this);
         }
 
         public void CallMethod(string key) => rpcUtility.CallMethod(key);
