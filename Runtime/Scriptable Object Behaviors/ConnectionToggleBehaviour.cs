@@ -1,7 +1,6 @@
 using FishNet.Transporting;
 using NaughtyAttributes;
 using System.Collections;
-using System.Collections.Generic;
 using UnityAtoms.BaseAtoms;
 using UnityEngine;
 using UnityEngine.Events;
@@ -38,6 +37,21 @@ namespace Network
             OnlineNetwork
         }
 
+        /// <summary>
+        /// Determines how the system responds when a connection fails or is lost.
+        /// </summary>
+        public enum ConnectionFailureResponse
+        {
+            /// <summary>
+            /// End all connections and revert to ConnectionPhase.None / NetworkState.None.
+            /// </summary>
+            EndConnection,
+            /// <summary>
+            /// Automatically fall back to the Offline connection (starts the offline host).
+            /// </summary>
+            FallbackToOffline
+        }
+
         #region Serialized Fields
 
         [Header("Settings")]
@@ -48,8 +62,10 @@ namespace Network
 
         [Space(10)]
 
-        [SerializeField, Tooltip("If marked as true, whenever a client's connection is lost while in Online mode, the connection will automatically toggle back to the Offline connection.")]
-        private bool fallbackToOfflineIfOnlineConnectionFails;
+        [SerializeField, Tooltip("Determines what happens when a connection fails or is lost.\n\n" +
+            "FallbackToOffline: Automatically toggle back to the Offline connection.\n" +
+            "EndConnection: End all connections, reverting to ConnectionPhase.None.")]
+        private ConnectionFailureResponse connectionFailureResponse = ConnectionFailureResponse.EndConnection;
 
         [Header("References")]
 
@@ -86,8 +102,8 @@ namespace Network
         [Tooltip("Event called when a client's connection continues to fail through all retry attempts.")]
         public UnityEvent onOnlineConnectionFailed;
 
-        [Tooltip("Event called when a client's connection is lost while in Online mode, and the connection is falling back to Offline mode.")]
-        public UnityEvent onFallingBackToOffline;
+        [Tooltip("Event called when a connection is lost and the connection failure response is being executed.")]
+        public UnityEvent onConnectionLost;
 
         [Header("Debug")]
         [SerializeField, Tooltip("Determines how clients will connect when a ParrelSync Clone is active. If set to `Local Network`, the editor instances will all connect using the `Parrel Sync Local Connection` connection settings. Otherwise the clones will connect through the default Online connection settings.")]
@@ -99,7 +115,7 @@ namespace Network
         private ConnectionBehaviour parrelSyncLocalConnection;
 
         private Coroutine connectionCoroutine;
-        private Coroutine offlineFallbackCoroutine;
+        private Coroutine connectionFailureWatchCoroutine;
 
         #endregion
 
@@ -118,7 +134,7 @@ namespace Network
         protected override void Initialize()
         {
             connectionCoroutine = null;
-            offlineFallbackCoroutine = null;
+            connectionFailureWatchCoroutine = null;
         }
 
         protected override void Cleanup()
@@ -126,11 +142,11 @@ namespace Network
             if (connectionCoroutine != null)
                 CoWorker.Stop(connectionCoroutine);
 
-            if (offlineFallbackCoroutine != null)
-                CoWorker.Stop(offlineFallbackCoroutine);
+            if (connectionFailureWatchCoroutine != null)
+                CoWorker.Stop(connectionFailureWatchCoroutine);
 
             connectionCoroutine = null;
-            offlineFallbackCoroutine = null;
+            connectionFailureWatchCoroutine = null;
 
             offlineConnection?.StopHost();
             parrelSyncLocalConnection?.StopHost();
@@ -209,13 +225,38 @@ namespace Network
                 return;
             }
 
-            if (offlineFallbackCoroutine != null)
-            {
-                CoWorker.Stop(offlineFallbackCoroutine);
-                offlineFallbackCoroutine = null;
-            }
+            StopConnectionFailureWatch();
 
             connectionCoroutine = CoWorker.Work(DoGoOffline());
+        }
+
+        /// <summary>
+        /// Ends any active connections, without going through the normal connection toggling process. This sets the NetworkState to None.
+        /// </summary>
+        public async void EndConnection()
+        {
+            if (connectionCoroutine != null)
+            {
+                CoWorker.Stop(connectionCoroutine);
+                connectionCoroutine = null;
+            }
+
+            StopConnectionFailureWatch();
+
+            offlineConnection?.StopHost();
+            parrelSyncLocalConnection?.StopHost();
+            onlineConnection?.StopHost();
+
+            while (!connectionsStopped)
+                await System.Threading.Tasks.Task.Yield();
+
+            connectionPhase.Value = ConnectionPhase.None;
+
+            networkState.Value = NetworkState.None;
+
+            Debug.Log("Connection Toggle - Network connection ended.");
+
+            onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
         }
 
         /// <summary>
@@ -228,11 +269,8 @@ namespace Network
                 CoWorker.Stop(connectionCoroutine);
                 connectionCoroutine = null;
             }
-            if (offlineFallbackCoroutine != null)
-            {
-                CoWorker.Stop(offlineFallbackCoroutine);
-                offlineFallbackCoroutine = null;
-            }
+
+            StopConnectionFailureWatch();
 
             offlineConnection?.StopHost();
             parrelSyncLocalConnection?.StopHost();
@@ -378,13 +416,14 @@ namespace Network
                     }
                 }
 
-                // If still not connected after all attempts, go offline (prevents hanging in StartingClient).
+                // If still not connected after all attempts, handle based on the configured failure response.
                 if (clientConnectionState.Value != LocalConnectionState.Started)
                 {
-                    Debug.LogWarning("Connection Toggle - Client failed to connect after multiple attempts, returning to Offline mode.");
+                    Debug.LogWarning("Connection Toggle - Client failed to connect after multiple attempts.");
 
                     connectionCoroutine = null;
-                    GoOffline();
+
+                    HandleConnectionFailure();
 
                     onOnlineConnectionFailed?.Invoke();
 
@@ -409,10 +448,7 @@ namespace Network
 
             onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
 
-            if (fallbackToOfflineIfOnlineConnectionFails && !asHost && !asServer && offlineFallbackCoroutine == null)
-            {
-                offlineFallbackCoroutine = CoWorker.Work(DoGoOfflineFallback());
-            }
+            StartConnectionFailureWatch();
 
             connectionCoroutine = null;
         }
@@ -461,36 +497,79 @@ namespace Network
             onNetworkOffline?.Invoke();
 
             onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
+                
+            offlineConnection?.StartHost();
 
-            // If this is a dedicated server (or parrel sync server), we dont want to start any connections for offline mode
-            var startOfflineConnection = true;
-
-#if UNITY_SERVER
-            startOfflineConnection = false; 
-#else
-            if (ParrelSyncManager.type == ParrelSyncManager.ParrelInstanceType.Server) 
-                startOfflineConnection = false;
-#endif
-
-            if (startOfflineConnection)
-                offlineConnection?.StartHost();
+            StartConnectionFailureWatch();
 
             connectionCoroutine = null;
         }
 
-        private IEnumerator DoGoOfflineFallback()
+        /// <summary>
+        /// Starts the connection failure watcher coroutine, stopping any existing one first.
+        /// </summary>
+        private void StartConnectionFailureWatch()
         {
-            while (networkState.Value == NetworkState.Online)
+            StopConnectionFailureWatch();
+            connectionFailureWatchCoroutine = CoWorker.Work(DoConnectionFailureWatch());
+        }
+
+        /// <summary>
+        /// Stops the connection failure watcher coroutine if one is running.
+        /// </summary>
+        private void StopConnectionFailureWatch()
+        {
+            if (connectionFailureWatchCoroutine != null)
             {
-                // if the client connection fails, return to offline mode
-                if (clientConnectionState.Value == LocalConnectionState.Stopped || ApplicationInfo.internetAvailabilityStatus != ApplicationInfo.InternetAvailabilityStatus.Online)
+                CoWorker.Stop(connectionFailureWatchCoroutine);
+                connectionFailureWatchCoroutine = null;
+            }
+        }
+
+        /// <summary>
+        /// Monitors the active connection and triggers the configured failure response if the connection is lost.
+        /// Watches both Online and Offline states.
+        /// </summary>
+        private IEnumerator DoConnectionFailureWatch()
+        {
+            while (networkState.Value == NetworkState.Online || networkState.Value == NetworkState.Offline)
+            {
+                bool connectionLost = false;
+
+                switch (connectionPhase.Value)
                 {
-                    Debug.LogWarning("Connection Toggle - Client connection lost, returning to Offline mode.");
+                    // Online client - lost if client stopped or internet unavailable
+                    case ConnectionPhase.OnlineAsClient:
+                        connectionLost = clientConnectionState.Value == LocalConnectionState.Stopped
+                            || ApplicationInfo.internetAvailabilityStatus != ApplicationInfo.InternetAvailabilityStatus.Online;
+                        break;
+
+                    // Online server - lost if server stopped
+                    case ConnectionPhase.OnlineAsServer:
+                        connectionLost = serverConnectionState.Value == LocalConnectionState.Stopped;
+                        break;
+
+                    // Online host - lost if either server or client stopped
+                    case ConnectionPhase.OnlineAsHost:
+                        connectionLost = serverConnectionState.Value == LocalConnectionState.Stopped
+                            || clientConnectionState.Value == LocalConnectionState.Stopped;
+                        break;
+
+                    // Offline (local host) - lost if both connections stopped unexpectedly
+                    case ConnectionPhase.Offline:
+                        connectionLost = connectionsStopped;
+                        break;
+                }
+
+                if (connectionLost)
+                {
+                    Debug.LogWarning($"Connection Toggle - Connection lost during {connectionPhase.Value}.");
 
                     connectionCoroutine = null;
-                    GoOffline();
 
-                    onFallingBackToOffline?.Invoke();
+                    HandleConnectionFailure();
+
+                    onConnectionLost?.Invoke();
 
                     yield break;
                 }
@@ -498,7 +577,35 @@ namespace Network
                 yield return null;
             }
 
-            offlineFallbackCoroutine = null;
+            connectionFailureWatchCoroutine = null;
+        }
+
+        /// <summary>
+        /// Executes the configured connection failure response.
+        /// </summary>
+        private void HandleConnectionFailure()
+        {
+            switch (connectionFailureResponse)
+            {
+                case ConnectionFailureResponse.FallbackToOffline:
+                    if (networkState.Value == NetworkState.Offline)
+                    {
+                        // Already offline and the offline connection failed — revert to None.
+                        Debug.Log("Connection Toggle - Offline connection failed, ending all connections.");
+                        EndConnection();
+                    }
+                    else
+                    {
+                        Debug.Log("Connection Toggle - Falling back to Offline mode.");
+                        GoOffline();
+                    }
+                    break;
+
+                case ConnectionFailureResponse.EndConnection:
+                    Debug.Log("Connection Toggle - Ending all connections.");
+                    EndConnection();
+                    break;
+            }
         }
     }
 }
