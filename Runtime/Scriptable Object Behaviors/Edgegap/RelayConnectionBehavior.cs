@@ -71,12 +71,6 @@ namespace Network.Edgegap
             if (serverManager == null || !serverManager.Started)
                 return;
 
-            if (Ref.TryGet<RelayManager>(out var relayManager))
-            {
-                Debug.Log("Stopping Relay Session");
-                await relayManager.DeleteSessionIfHostAsync();
-            }
-
             var transportManager = InstanceFinder.TransportManager;
             var transport = transportManager?.GetTransport(transportIndex);
 
@@ -84,6 +78,12 @@ namespace Network.Edgegap
             {
                 Debug.Log("Stopping Server Connection");
                 transportManager.GetTransport<Multipass>()?.StopServerConnection(sendDisconnectMessage, transportIndex);
+            }
+
+            if (Ref.TryGet<RelayManager>(out var relayManager))
+            {
+                Debug.Log("Stopping Relay Session");
+                await relayManager.DeleteSessionIfHostAsync();
             }
         }
 
