@@ -231,10 +231,12 @@ namespace Network
             connectionCoroutine = CoWorker.Work(DoGoOffline());
         }
 
+        public void EndConnection() => _ = EndConnectionAsync();
+
         /// <summary>
         /// Ends any active connections, without going through the normal connection toggling process. This sets the NetworkState to None.
         /// </summary>
-        public async Task EndConnection()
+        public async Task EndConnectionAsync()
         {
             if (connectionCoroutine != null)
             {
@@ -243,6 +245,21 @@ namespace Network
             }
 
             StopConnectionFailureWatch();
+
+            switch (connectionPhase.Value)
+            {
+                case ConnectionPhase.OnlineAsHost:
+                    connectionPhase.Value = ConnectionPhase.StoppingHost;
+                    break;
+                case ConnectionPhase.OnlineAsServer:
+                    connectionPhase.Value = ConnectionPhase.StoppingServer;
+                    break;
+                case ConnectionPhase.OnlineAsClient:
+                    connectionPhase.Value = ConnectionPhase.StoppingClient;
+                    break;
+            }
+
+            onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
 
             offlineConnection?.StopHost();
             parrelSyncLocalConnection?.StopHost();
@@ -273,6 +290,21 @@ namespace Network
 
             StopConnectionFailureWatch();
 
+            switch (connectionPhase.Value)
+            {
+                case ConnectionPhase.OnlineAsHost:
+                    connectionPhase.Value = ConnectionPhase.StoppingHost;
+                    break;
+                case ConnectionPhase.OnlineAsServer:
+                    connectionPhase.Value = ConnectionPhase.StoppingServer;
+                    break;
+                case ConnectionPhase.OnlineAsClient:
+                    connectionPhase.Value = ConnectionPhase.StoppingClient;
+                    break;
+            }
+
+            onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
+
             offlineConnection?.StopHost();
             parrelSyncLocalConnection?.StopHost();
             onlineConnection?.StopHost();
@@ -280,6 +312,7 @@ namespace Network
             connectionPhase.Value = ConnectionPhase.None;
 
             networkState.Value = NetworkState.None;
+
             Debug.Log("Connection Toggle - Network connection ended.");
 
             onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
@@ -593,7 +626,7 @@ namespace Network
                     {
                         // Already offline and the offline connection failed — revert to None.
                         Debug.Log("Connection Toggle - Offline connection failed, ending all connections.");
-                        EndConnection();
+                        EndConnectionAsync();
                     }
                     else
                     {
@@ -604,7 +637,7 @@ namespace Network
 
                 case ConnectionFailureResponse.EndConnection:
                     Debug.Log("Connection Toggle - Ending all connections.");
-                    EndConnection();
+                    EndConnectionAsync();
                     break;
             }
         }
