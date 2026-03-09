@@ -11,8 +11,6 @@ using UnityEngine.Events;
 using Services.Edgegap;
 using FishNet.Transporting.KCP.Edgegap;
 using FishNet.Transporting;
-using Unity.Networking.Transport.Relay;
-using Unity.Services.Relay.Models;
 
 
 namespace Network.Edgegap
@@ -50,40 +48,34 @@ namespace Network.Edgegap
                 var result = await lobbyIpLookup.GetLobbyIpsAsync();
                 var clientIps = result.lobbyIps;
 
-                var relayService = relayManager.GetRelayService();
-
                 Debug.Log("Relay Connection: Creating session");
-                var response = await relayService.CreateSessionAsync(clientIps);
+                var response = await relayManager.CreateSessionAsync(clientIps);
 
-                // Store session centrally
-                relayManager.SetSession(response);
-
-                //Convert uint? to uint
-                uint sessionAuthorizationToken = response.authorization_token ?? 0;
-                uint userAuthorizationToken = GetLocalSessionUser(response)?.authorization_token ?? 0;
-
-                var relay = response.relay;
-                string address = relay.ip;
-                ushort serverPort = relay.ports.server.port;
-                ushort clientPort = relay.ports.client.port;
-                var relayData = new EdgegapRelayData(address, serverPort, clientPort, userAuthorizationToken, sessionAuthorizationToken);
+                var relayData = BuildRelayData(relayManager, response);
 
                 Debug.Log("Relay Connection: Relay Session Started. Starting server connection");
 
                 transport.SetEdgegapRelayData(relayData);
-
                 transport.StartConnection(true);
 
                 onRelaySessionIdCreated?.Invoke(relayManager.RelaySessionId);
             }
         }
 
-        public override void StopServer(bool sendDisconnectMessage = true)
+        public async override void StopServer(bool sendDisconnectMessage = true)  => await StopServerAsync(sendDisconnectMessage);
+
+        public async Task StopServerAsync(bool sendDisconnectMessage = true)
         {
             var serverManager = InstanceFinder.ServerManager;
 
             if (serverManager == null || !serverManager.Started)
                 return;
+
+            if (Ref.TryGet<RelayManager>(out var relayManager))
+            {
+                Debug.Log("Stopping Relay Session");
+                await relayManager.DeleteSessionIfHostAsync();
+            }
 
             var transportManager = InstanceFinder.TransportManager;
             var transport = transportManager?.GetTransport(transportIndex);
@@ -108,7 +100,7 @@ namespace Network.Edgegap
 
                 var serverManager = InstanceFinder.ServerManager;
 
-                // No need to Set Relay Server Data if connecting as Host (IE if ServerManager is already started)
+                // No need to set relay data if connecting as host (ServerManager already started)
                 if (serverManager == null || !serverManager.Started)
                 {
                     var relayManager = Ref.Get<RelayManager>();
@@ -119,19 +111,15 @@ namespace Network.Edgegap
                         return;
                     }
 
-                    // Check if this client is already authorized; if not, wait for host to authorize
-                    if (!await WaitForAuthorizationAsync(relayManager))
+                    var response = await relayManager.JoinSessionAsync();
+
+                    if (response == null)
                     {
-                        Debug.LogError("Relay Connection: Client was not authorized on the relay session. Cannot connect.");
+                        Debug.LogError("Relay Connection: Failed to join relay session.");
                         return;
                     }
 
-                    var relayService = relayManager.GetRelayService();
-                    var response = await relayService.JoinSessionAsync(relayManager.RelaySessionId);
-
-                    //Convert uint? to uint
-                    uint sessionAuthorizationToken = response.authorization_token ?? 0;
-                    uint userAuthorizationToken = GetLocalSessionUser(response)?.authorization_token ?? 0;
+                    uint userAuthorizationToken = relayManager.GetLocalSessionUser(response)?.authorization_token ?? 0;
 
                     if (userAuthorizationToken == 0)
                     {
@@ -139,12 +127,7 @@ namespace Network.Edgegap
                         return;
                     }
 
-                    var relay = response.relay;
-                    string address = relay.ip;
-                    ushort serverPort = relay.ports.server.port;
-                    ushort clientPort = relay.ports.client.port;
-                    var relayData = new EdgegapRelayData(address, serverPort, clientPort, userAuthorizationToken, sessionAuthorizationToken);
-
+                    var relayData = BuildRelayData(relayManager, response);
                     transport.SetEdgegapRelayData(relayData);
                 }
 
@@ -161,82 +144,19 @@ namespace Network.Edgegap
         }
 
         /// <summary>
-        /// Polls the relay session until the local player's IP appears as an authorized user, or until timeout.
+        /// Builds <see cref="EdgegapRelayData"/> from a session response using the local player's tokens.
         /// </summary>
-        async Task<bool> WaitForAuthorizationAsync(RelayManager relayManager, float timeoutSeconds = 15f)
+        EdgegapRelayData BuildRelayData(RelayManager relayManager, RelayService.SessionResponse response)
         {
-            if (!Ref.TryGet(out Services.UGS.LobbyManager lobbyManager))
-                return false;
+            uint sessionAuthorizationToken = response.authorization_token ?? 0;
+            uint userAuthorizationToken = relayManager.GetLocalSessionUser(response)?.authorization_token ?? 0;
 
-            var localPlayer = lobbyManager.GetLocalPlayer();
-            if (localPlayer == null) return false;
+            var relay = response.relay;
+            string address = relay.ip;
+            ushort serverPort = relay.ports.server.port;
+            ushort clientPort = relay.ports.client.port;
 
-            var localIP = lobbyManager.GetPlayerDataValue(localPlayer, Constants.Services.Edgegap.LobbyPlayerDataKeys.PublicIp);
-            if (string.IsNullOrEmpty(localIP))
-            {
-                Debug.LogError("Relay Connection: Local player has no public IP in lobby data.");
-                return false;
-            }
-
-            // If the session is already cached and user is in it, skip polling
-            if (relayManager.IsUserAuthorized(localIP))
-                return true;
-
-            // Poll the session from the API until authorized or timeout
-            var relayService = relayManager.GetRelayService();
-            float elapsed = 0f;
-            float pollInterval = 1.5f;
-
-            while (elapsed < timeoutSeconds)
-            {
-                await Task.Delay((int)(pollInterval * 1000));
-                elapsed += pollInterval;
-
-                try
-                {
-                    var session = await relayService.GetSessionAsync(relayManager.RelaySessionId);
-                    relayManager.SetSession(session);
-
-                    if (relayManager.IsUserAuthorized(localIP))
-                    {
-                        Debug.Log("Relay Connection: Client authorized on relay session.");
-                        return true;
-                    }
-                }
-                catch (Exception e)
-                {
-                    Debug.LogWarning($"Relay Connection: Error polling session for authorization: {e.Message}");
-                }
-            }
-
-            return false;
-        }
-
-        RelayService.SessionUser GetLocalSessionUser(RelayService.SessionResponse response)
-        {
-            if (response.session_users == null || response.session_users.Count == 0)
-            {
-                Debug.LogError("Relay Connection: No session users found in the response.");
-                return null;
-            }
-
-            if (Ref.TryGet(out Services.UGS.LobbyManager lobbyManager))
-            {
-                // Get the local player's public IP from the lobby data
-                var localIP = lobbyManager.GetPlayerDataValue(lobbyManager.GetLocalPlayer(), Constants.Services.Edgegap.LobbyPlayerDataKeys.PublicIp);
-                // Use it to find the local player's index in the session users
-                int localPlayerIndex = response.session_users.FindIndex(user => user.ip_address == localIP);
-                if (localPlayerIndex >= 0)
-                {
-                    return response.session_users[localPlayerIndex];
-                }
-                else
-                {
-                    Debug.LogError("Relay Connection: Local player not found in session users.");
-                }
-            }
-
-            return null;
+            return new EdgegapRelayData(address, serverPort, clientPort, userAuthorizationToken, sessionAuthorizationToken);
         }
     }
 }
