@@ -1,6 +1,7 @@
 using FishNet.Transporting;
 using NaughtyAttributes;
 using System.Collections;
+using System.Threading.Tasks;
 using UnityAtoms.BaseAtoms;
 using UnityEngine;
 using UnityEngine.Events;
@@ -233,7 +234,7 @@ namespace Network
         /// <summary>
         /// Ends any active connections, without going through the normal connection toggling process. This sets the NetworkState to None.
         /// </summary>
-        public async void EndConnection()
+        public async Task EndConnection()
         {
             if (connectionCoroutine != null)
             {
