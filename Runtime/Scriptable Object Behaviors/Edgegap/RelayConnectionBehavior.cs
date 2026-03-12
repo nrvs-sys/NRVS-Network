@@ -4,6 +4,7 @@ using FishNet.Transporting.Multipass;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityAtoms.BaseAtoms;
 using UnityEngine;
@@ -25,6 +26,9 @@ namespace Network.Edgegap
         [Tooltip("Invoked on the Lobby host when they create a new session.")]
         public UnityEvent<string> onRelaySessionIdCreated;
 
+        private CancellationTokenSource serverCts;
+        private CancellationTokenSource clientCts;
+
         public override async void StartHost()
         {
             await StartServerAsync();
@@ -35,6 +39,9 @@ namespace Network.Edgegap
 
         public async Task StartServerAsync()
         {
+            CancelAndResetCts(ref serverCts);
+            var ct = serverCts.Token;
+
             var transportManager = InstanceFinder.TransportManager;
             var transport = (EdgegapKcpTransport)transportManager?.GetTransport(transportIndex);
 
@@ -46,10 +53,13 @@ namespace Network.Edgegap
                 Debug.Log("Relay Connection: Lobby host, getting ips");
 
                 var result = await lobbyIpLookup.GetLobbyIpsAsync();
+                if (ct.IsCancellationRequested) return;
+
                 var clientIps = result.lobbyIps;
 
                 Debug.Log("Relay Connection: Creating session");
                 var response = await relayManager.CreateSessionAsync(clientIps);
+                if (ct.IsCancellationRequested) return;
 
                 var relayData = BuildRelayData(relayManager, response);
 
@@ -62,10 +72,12 @@ namespace Network.Edgegap
             }
         }
 
-        public async override void StopServer(bool sendDisconnectMessage = true)  => await StopServerAsync(sendDisconnectMessage);
+        public async override void StopServer(bool sendDisconnectMessage = true) => await StopServerAsync(sendDisconnectMessage);
 
         public async Task StopServerAsync(bool sendDisconnectMessage = true)
         {
+            CancelCts(ref serverCts);
+
             var serverManager = InstanceFinder.ServerManager;
 
             if (serverManager == null || !serverManager.Started)
@@ -91,6 +103,9 @@ namespace Network.Edgegap
 
         public async Task StartClientAsync()
         {
+            CancelAndResetCts(ref clientCts);
+            var ct = clientCts.Token;
+
             var transportManager = InstanceFinder.TransportManager;
             var transport = (EdgegapKcpTransport)transportManager?.GetTransport(transportIndex);
 
@@ -112,6 +127,11 @@ namespace Network.Edgegap
                     }
 
                     var response = await relayManager.JoinSessionAsync();
+                    if (ct.IsCancellationRequested)
+                    {
+                        Debug.Log("Relay Connection: Client start cancelled after JoinSessionAsync.");
+                        return;
+                    }
 
                     if (response == null)
                     {
@@ -131,12 +151,20 @@ namespace Network.Edgegap
                     transport.SetEdgegapRelayData(relayData);
                 }
 
+                if (ct.IsCancellationRequested)
+                {
+                    Debug.Log("Relay Connection: Client start cancelled before transport connection.");
+                    return;
+                }
+
                 transport.StartConnection(false);
             }
         }
 
         public override void StopClient()
         {
+            CancelCts(ref clientCts);
+
             var clientManager = InstanceFinder.ClientManager;
 
             if (clientManager != null && clientManager.Started)
@@ -157,6 +185,26 @@ namespace Network.Edgegap
             ushort clientPort = relay.ports.client.port;
 
             return new EdgegapRelayData(address, serverPort, clientPort, userAuthorizationToken, sessionAuthorizationToken);
+        }
+
+        /// <summary>
+        /// Cancels the existing CTS and creates a fresh one.
+        /// </summary>
+        private static void CancelAndResetCts(ref CancellationTokenSource cts)
+        {
+            cts?.Cancel();
+            cts?.Dispose();
+            cts = new CancellationTokenSource();
+        }
+
+        /// <summary>
+        /// Cancels and disposes the CTS without creating a new one.
+        /// </summary>
+        private static void CancelCts(ref CancellationTokenSource cts)
+        {
+            cts?.Cancel();
+            cts?.Dispose();
+            cts = null;
         }
     }
 }

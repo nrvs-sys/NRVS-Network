@@ -238,6 +238,8 @@ namespace Network
         /// </summary>
         public async Task EndConnectionAsync()
         {
+            Debug.Log("Connection Toggle - Ending all connections...");
+
             if (connectionCoroutine != null)
             {
                 CoWorker.Stop(connectionCoroutine);
@@ -272,7 +274,7 @@ namespace Network
 
             networkState.Value = NetworkState.None;
 
-            Debug.Log("Connection Toggle - Network connection ended.");
+            Debug.Log("Connection Toggle - Network connection(s) ended.");
 
             onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
         }
@@ -313,7 +315,7 @@ namespace Network
 
             networkState.Value = NetworkState.None;
 
-            Debug.Log("Connection Toggle - Network connection ended.");
+            Debug.Log("Connection Toggle - Network connection(s) ended.");
 
             onConnectionPhaseChanged?.Invoke(connectionPhase.Value);
         }
