@@ -29,6 +29,12 @@ namespace Network.Edgegap
         private CancellationTokenSource serverCts;
         private CancellationTokenSource clientCts;
 
+        private ConnectionState serverConnectionState;
+        private ConnectionState clientConnectionState;
+
+        public override ConnectionState GetServerConnectionState() => serverConnectionState;
+        public override ConnectionState GetClientConnectionState() => clientConnectionState;
+
         public override async void StartHost()
         {
             await StartServerAsync();
@@ -41,6 +47,8 @@ namespace Network.Edgegap
         {
             CancelAndResetCts(ref serverCts);
             var ct = serverCts.Token;
+
+            serverConnectionState = ConnectionState.Starting;
 
             var transportManager = InstanceFinder.TransportManager;
             var transport = (EdgegapKcpTransport)transportManager?.GetTransport(transportIndex);
@@ -70,6 +78,9 @@ namespace Network.Edgegap
 
                 onRelaySessionIdCreated?.Invoke(relayManager.RelaySessionId);
             }
+
+            if (!ct.IsCancellationRequested)
+                serverConnectionState = ConnectionState.None;
         }
 
         public async override void StopServer(bool sendDisconnectMessage = true) => await StopServerAsync(sendDisconnectMessage);
@@ -78,10 +89,15 @@ namespace Network.Edgegap
         {
             CancelCts(ref serverCts);
 
+            serverConnectionState = ConnectionState.Stopping;
+
             var serverManager = InstanceFinder.ServerManager;
 
             if (serverManager == null || !serverManager.Started)
+            {
+                serverConnectionState = ConnectionState.None;
                 return;
+            }
 
             var transportManager = InstanceFinder.TransportManager;
             var transport = transportManager?.GetTransport(transportIndex);
@@ -97,6 +113,8 @@ namespace Network.Edgegap
                 Debug.Log("Stopping Relay Session");
                 await relayManager.DeleteSessionIfHostAsync();
             }
+
+            serverConnectionState = ConnectionState.None;
         }
 
         public async override void StartClient() => await StartClientAsync();
@@ -105,6 +123,8 @@ namespace Network.Edgegap
         {
             CancelAndResetCts(ref clientCts);
             var ct = clientCts.Token;
+
+            clientConnectionState = ConnectionState.Starting;
 
             var transportManager = InstanceFinder.TransportManager;
             var transport = (EdgegapKcpTransport)transportManager?.GetTransport(transportIndex);
@@ -123,6 +143,7 @@ namespace Network.Edgegap
                     if (string.IsNullOrEmpty(relayManager.RelaySessionId))
                     {
                         Debug.LogError("Relay Connection: No relay session ID available. Cannot start client.");
+                        clientConnectionState = ConnectionState.None;
                         return;
                     }
 
@@ -136,6 +157,7 @@ namespace Network.Edgegap
                     if (response == null)
                     {
                         Debug.LogError("Relay Connection: Failed to join relay session.");
+                        clientConnectionState = ConnectionState.None;
                         return;
                     }
 
@@ -144,6 +166,7 @@ namespace Network.Edgegap
                     if (userAuthorizationToken == 0)
                     {
                         Debug.LogError("Relay Connection: Client has no valid user authorization token. The host may not have authorized this client yet.");
+                        clientConnectionState = ConnectionState.None;
                         return;
                     }
 
@@ -159,16 +182,23 @@ namespace Network.Edgegap
 
                 transport.StartConnection(false);
             }
+
+            if (!ct.IsCancellationRequested)
+                clientConnectionState = ConnectionState.None;
         }
 
         public override void StopClient()
         {
             CancelCts(ref clientCts);
 
+            clientConnectionState = ConnectionState.Stopping;
+
             var clientManager = InstanceFinder.ClientManager;
 
             if (clientManager != null && clientManager.Started)
                 clientManager.StopConnection();
+
+            clientConnectionState = ConnectionState.None;
         }
 
         /// <summary>

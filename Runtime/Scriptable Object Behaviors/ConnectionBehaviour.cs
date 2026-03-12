@@ -10,6 +10,13 @@ namespace Network
     /// </summary>
     public abstract class ConnectionBehaviour : ScriptableObject
     {
+        public enum ConnectionState
+        {
+            None,
+            Starting,
+            Stopping
+        }
+
         [SerializeField, Min(0), Tooltip("The index of the desired Transport as determined by the NetworkManager's Multipass Transport")]
         protected int transportIndex = 0;
 
@@ -32,5 +39,8 @@ namespace Network
         public abstract void StartClient();
 
         public abstract void StopClient();
+
+        public abstract ConnectionState GetServerConnectionState();
+        public abstract ConnectionState GetClientConnectionState();
     }
 }
