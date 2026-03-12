@@ -58,8 +58,6 @@ namespace Network
         [Header("Settings")]
         [SerializeField, Tooltip("The number of times to retry starting the online client connection if it fails.")]
         private int onlineConnectionRetryCount = 3;
-        [SerializeField, Tooltip("The delay between retry attempts when starting the online client connection.")]
-        private float onlineConnectionRetryDelay = 2f;
 
         [Space(10)]
 
@@ -403,18 +401,17 @@ namespace Network
 
                     targetConnection.StartClient();
 
-                    // Wait until either started or failed back to stopped.
-                    while (networkState.Value == NetworkState.Online && connectionPhase.Value == ConnectionPhase.StartingClient)
+                    // Wait for the connection behaviour to finish its start process.
+                    while (networkState.Value == NetworkState.Online &&
+                           connectionPhase.Value == ConnectionPhase.StartingClient &&
+                           targetConnection.GetClientConnectionState() == ConnectionBehaviour.ConnectionState.Starting)
                     {
-                        var s = clientConnectionState.Value;
-                        if (s == LocalConnectionState.Started)
-                            break;
-
-                        if (s == LocalConnectionState.Stopped)
-                            break;
-
                         yield return null;
                     }
+
+                    // The behaviour has finished starting — now check the transport-level result.
+                    // Wait briefly for the transport state to settle after the behaviour completes.
+                    yield return null;
 
                     if (clientConnectionState.Value == LocalConnectionState.Started)
                     {
@@ -429,27 +426,13 @@ namespace Network
                         if (connectionStartedDelay >= 1f)
                             break; // connection is stable
 
-                        else
-                        {
-                            Debug.LogWarning("Connection Toggle - Client connection unstable, retrying...");
-                            while (clientConnectionState.Value != LocalConnectionState.Stopped)
-                                yield return null;
-                        }
+                        Debug.LogWarning("Connection Toggle - Client connection unstable, retrying...");
+                        while (clientConnectionState.Value != LocalConnectionState.Stopped)
+                            yield return null;
                     }
 
-                    if (attempts > onlineConnectionRetryCount)
+                    if (attempts >= onlineConnectionRetryCount)
                         break;
-
-                    // Delay before next attempt.
-                    float t = 0f;
-                    while (t < onlineConnectionRetryDelay &&
-                           networkState.Value == NetworkState.Online &&
-                           connectionPhase.Value == ConnectionPhase.StartingClient &&
-                           clientConnectionState.Value != LocalConnectionState.Started)
-                    {
-                        t += Time.unscaledDeltaTime;
-                        yield return null;
-                    }
                 }
 
                 // If still not connected after all attempts, handle based on the configured failure response.
