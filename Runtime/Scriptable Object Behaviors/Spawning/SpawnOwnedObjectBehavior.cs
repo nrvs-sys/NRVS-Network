@@ -6,16 +6,29 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 
 [CreateAssetMenu(fileName = "Spawn Owned Object_ New", menuName = "Behaviors/Spawning/Spawn Owned Object")]
 public class SpawnOwnedObjectBehavior : ScriptableObject
 {
+    public enum SpawnSceneBehavior
+    {
+        /// <summary>
+        /// Adds the spawned object to the active scene if no global scenes are specified through the SceneManager. If global scenes are specified, the object will be added to the first global scene. This uses the SceneManager.AddOwnerToDefaultScene() method.
+        /// </summary>
+        Default,
+        /// <summary>
+        /// Adds the spawned object to the same scene as the interacted object. If the interacted object is not in a valid scene, it will fall back to the Default behavior and add the spawned object to the active scene if no global scenes are specified through the SceneManager, or to the first global scene if global scenes are specified.
+        /// </summary>
+        SameAsInteractedObject,
+    }
+
     [SerializeField]
     NetworkObject objectPrefab;
 
-    [SerializeField, Tooltip("True to add object to the active scene when no global scenes are specified through the SceneManager.")]
-    private bool addToDefaultScene = true;
+    [SerializeField, Tooltip("Determines which scene the object is spawned into.")]
+    private SpawnSceneBehavior spawnSceneBehavior = SpawnSceneBehavior.Default;
 
     [SerializeField, Tooltip("True to spawn the object with the same transform components as the passed in object (For Network Objects")]
     bool copyTransform = true;
@@ -25,7 +38,7 @@ public class SpawnOwnedObjectBehavior : ScriptableObject
     public UnityEvent<NetworkObject> onSpawned;
 
 
-    public static NetworkObject Spawn(NetworkConnection conn, NetworkObject prefab, Vector3 position, Quaternion rotation, Transform parent = null, bool addToDefaultScene = true)
+    public static NetworkObject Spawn(NetworkConnection conn, NetworkObject prefab, Vector3 position, Quaternion rotation, Transform parent = null, SpawnSceneBehavior spawnSceneBehavior = SpawnSceneBehavior.Default, Scene scene = default)
     {
         var networkManager = InstanceFinder.NetworkManager;
 
@@ -48,11 +61,23 @@ public class SpawnOwnedObjectBehavior : ScriptableObject
 
         Debug.Log($"Prefab spawned for client connection {conn.ClientId}.");
 
-        networkManager.ServerManager.Spawn(nob, conn);
-
-        //If there are no global scenes 
-        if (addToDefaultScene)
-            networkManager.SceneManager.AddOwnerToDefaultScene(nob);
+        switch (spawnSceneBehavior)
+        {
+            case SpawnSceneBehavior.Default:
+                networkManager.ServerManager.Spawn(nob, conn, scene);
+                networkManager.SceneManager.AddOwnerToDefaultScene(nob);
+                break;
+            case SpawnSceneBehavior.SameAsInteractedObject:
+                if (scene.IsValid())
+                    networkManager.ServerManager.Spawn(nob, conn, scene);
+                else
+                {
+                    networkManager.ServerManager.Spawn(nob, conn);
+                    networkManager.SceneManager.AddOwnerToDefaultScene(nob);
+                }
+                break;
+        }
+            
 
         return nob;
     }
@@ -97,7 +122,7 @@ public class SpawnOwnedObjectBehavior : ScriptableObject
             return;
         }
 
-        var nob = Spawn(conn, objectPrefab, Vector3.zero, Quaternion.identity, addToDefaultScene: addToDefaultScene);
+        var nob = Spawn(conn, objectPrefab, Vector3.zero, Quaternion.identity, spawnSceneBehavior: spawnSceneBehavior);
         
         if (nob != null)
             onSpawned?.Invoke(nob);
@@ -117,7 +142,7 @@ public class SpawnOwnedObjectBehavior : ScriptableObject
             return;
         }
 
-        var nob = Spawn(conn, objectPrefab, position, rotation, addToDefaultScene: addToDefaultScene);
+        var nob = Spawn(conn, objectPrefab, position, rotation, spawnSceneBehavior: spawnSceneBehavior);
 
         if (nob != null)
             onSpawned?.Invoke(nob);
@@ -140,7 +165,7 @@ public class SpawnOwnedObjectBehavior : ScriptableObject
         var connection = networkObject.Owner;
         if (connection != null)
         {
-            var nob = Spawn(connection, objectPrefab, copyTransform ? networkObject.transform.position : Vector3.zero, copyTransform ? networkObject.transform.rotation : Quaternion.identity, addToDefaultScene: addToDefaultScene);
+            var nob = Spawn(connection, objectPrefab, copyTransform ? networkObject.transform.position : Vector3.zero, copyTransform ? networkObject.transform.rotation : Quaternion.identity, spawnSceneBehavior: spawnSceneBehavior, scene: networkObject.gameObject.scene);
 
             if (nob != null)
                 onSpawned?.Invoke(nob);
