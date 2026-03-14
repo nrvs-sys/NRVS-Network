@@ -85,6 +85,8 @@ namespace Network.Edgegap
                 await Task.Yield();
             }
 
+            Debug.Log("Relay Connection: Server connection process completed with state: " + transport.GetConnectionState(true));
+
             if (!ct.IsCancellationRequested)
                 serverConnectionState = ConnectionState.None;
         }
@@ -199,6 +201,8 @@ namespace Network.Edgegap
                 {
                     await Task.Yield();
                 }
+
+                Debug.Log("Relay Connection: Client connection process completed with state: " + transport.GetConnectionState(false));
 
                 if (!ct.IsCancellationRequested)
                     clientConnectionState = ConnectionState.None;
