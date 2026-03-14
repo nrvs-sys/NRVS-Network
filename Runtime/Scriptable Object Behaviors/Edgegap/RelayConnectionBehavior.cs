@@ -79,6 +79,12 @@ namespace Network.Edgegap
                 onRelaySessionIdCreated?.Invoke(relayManager.RelaySessionId);
             }
 
+            // wait for the connection to start or fail
+            while (!ct.IsCancellationRequested && transport.GetConnectionState(true) == LocalConnectionState.Starting)
+            {
+                await Task.Yield();
+            }
+
             if (!ct.IsCancellationRequested)
                 serverConnectionState = ConnectionState.None;
         }
@@ -112,6 +118,12 @@ namespace Network.Edgegap
             {
                 Debug.Log("Stopping Relay Session");
                 await relayManager.DeleteSessionIfHostAsync();
+            }
+
+            // wait for the connection to stop
+            while (!serverManager.Started)
+            {
+                await Task.Yield();
             }
 
             serverConnectionState = ConnectionState.None;
@@ -181,10 +193,16 @@ namespace Network.Edgegap
                 }
 
                 transport.StartConnection(false);
-            }
 
-            if (!ct.IsCancellationRequested)
-                clientConnectionState = ConnectionState.None;
+                // wait for the connection to start or fail
+                while (!ct.IsCancellationRequested && transport.GetConnectionState(false) == LocalConnectionState.Starting)
+                {
+                    await Task.Yield();
+                }
+
+                if (!ct.IsCancellationRequested)
+                    clientConnectionState = ConnectionState.None;
+            }
         }
 
         public override void StopClient()

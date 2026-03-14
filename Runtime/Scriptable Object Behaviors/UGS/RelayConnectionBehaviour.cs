@@ -73,6 +73,12 @@ namespace Network.UGS
                 transport.SetRelayServerData(new RelayServerData(hostAllocation, "dtls"));
 
                 transport.StartConnection(true);
+
+                // wait until the server starts or fails
+                while (!ct.IsCancellationRequested && transport.GetConnectionState(true) == FishNet.Transporting.LocalConnectionState.Starting)
+                {
+                    await Task.Yield();
+                }
             }
 
             if (!ct.IsCancellationRequested)
@@ -135,6 +141,12 @@ namespace Network.UGS
                 if (ct.IsCancellationRequested) return;
 
                 transport.StartConnection(false);
+
+                // wait until the client starts or fails
+                while (!ct.IsCancellationRequested && transport.GetConnectionState(false) == FishNet.Transporting.LocalConnectionState.Starting)
+                {
+                    await Task.Yield();
+                }
             }
 
             if (!ct.IsCancellationRequested)

@@ -1,5 +1,6 @@
 using FishNet;
 using FishNet.Managing.Transporting;
+using FishNet.Transporting;
 using FishNet.Transporting.Multipass;
 using NaughtyAttributes;
 using System.Collections;
@@ -85,12 +86,13 @@ namespace Network
             {
                 transport.SetPort(connectionSettings.port);
                 transport.StartConnection(true);
-            }
 
-            // Wait until the server is started
-            var serverManager = InstanceFinder.ServerManager;
-            while ((serverManager == null || !serverManager.Started) && !ct.IsCancellationRequested)
-                await System.Threading.Tasks.Task.Yield();
+                // wait until the server starts or fails
+                while (!ct.IsCancellationRequested && transport.GetConnectionState(true) == LocalConnectionState.Starting)
+                {
+                    await Task.Yield();
+                }
+            }
 
             if (!ct.IsCancellationRequested)
                 serverConnectionState = ConnectionState.None;
@@ -111,12 +113,13 @@ namespace Network
                 transport.SetClientAddress(connectionSettings.address);
                 transport.SetPort(connectionSettings.port);
                 transport.StartConnection(false);
-            }
 
-            // Wait until the client is started
-            var clientManager = InstanceFinder.ClientManager;
-            while ((clientManager == null || !clientManager.Started) && !ct.IsCancellationRequested)
-                await System.Threading.Tasks.Task.Yield();
+                // wait until the client starts or fails
+                while (!ct.IsCancellationRequested && transport.GetConnectionState(false) == LocalConnectionState.Starting)
+                {
+                    await Task.Yield();
+                }
+            }
 
             if (!ct.IsCancellationRequested)
                 clientConnectionState = ConnectionState.None;
