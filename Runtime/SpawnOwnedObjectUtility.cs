@@ -52,7 +52,8 @@ namespace NRVS.Network
 
             SpawnOwnedObjectBehavior.Spawn(conn, networkObjectPrefab, spawnPosition, spawnRotation, parent: null, spawnSceneBehavior: spawnSceneBehavior, scene: gameObject.scene);
 
-            nextSpawnIndex = (nextSpawnIndex + 1) % spawnTransforms.Count;
+            if (spawnTransforms.Count > 0)
+                nextSpawnIndex = (nextSpawnIndex + 1) % spawnTransforms.Count;
         }
     }
 }
