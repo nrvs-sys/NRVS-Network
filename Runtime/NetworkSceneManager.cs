@@ -448,9 +448,6 @@ namespace Network
             {
                 Debug.Log($"Networked Scene Manager: Local client loaded networked scene: {scene.name}");
                 RpcClientConfirmSceneLoaded(scene.name);
-
-                if (!localNetworkedScenes.Contains(scene))
-                    localNetworkedScenes.Add(scene);
             }
         }
 
@@ -460,8 +457,6 @@ namespace Network
             {
                 Debug.Log($"Networked Scene Manager: Local client unloaded networked scene: {unloaded.Name}");
                 RpcClientSceneConfirmUnloaded(unloaded.Name);
-
-                localNetworkedScenes.Remove(unloaded.GetScene());
             }
         }
 
