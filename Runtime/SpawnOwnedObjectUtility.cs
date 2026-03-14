@@ -35,7 +35,13 @@ namespace NRVS.Network
             networkManager.SceneManager.OnClientLoadedStartScenes += SceneManager_OnClientLoadedStartScenes;
         }
 
-        private void SceneManager_OnClientLoadedStartScenes(NetworkConnection conn, bool asServer)
+        void OnDestroy()
+        {
+            if (networkManager != null)
+                networkManager.SceneManager.OnClientLoadedStartScenes -= SceneManager_OnClientLoadedStartScenes;
+        }
+
+        void SceneManager_OnClientLoadedStartScenes(NetworkConnection conn, bool asServer)
         {
             if (!asServer)
                 return;
