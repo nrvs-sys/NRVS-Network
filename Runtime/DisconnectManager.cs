@@ -64,7 +64,7 @@ namespace Network
                 Debug.LogWarning($"No disconnect handler found for code {disconnectCode}. Message: {message}. Disconnecting without action.");
             }
 
-            connectionToggle?.GoOffline();
+            connectionToggle?.EndConnection();
         }
 
         [ObserversRpc]
@@ -82,10 +82,10 @@ namespace Network
             }
 
             if (!IsServerInitialized)
-                connectionToggle?.GoOffline();
+                connectionToggle?.EndConnection();
             else
                 // If this is called on the Server, we only stop the Client Connection for now.
-                // If specified, the Server will "GoOffline" once all Clients have disconnected.
+                // If specified, the Server will "EndConnection" once all Clients have disconnected.
                 connectionToggle.OnlineConnection.StopClient();
         }
 
@@ -197,7 +197,7 @@ namespace Network
                 yield return null;
 
             if (stopServer)
-                connectionToggle?.GoOffline();
+                connectionToggle?.EndConnection();
 
             if (onComplete != null)
                 onComplete.Invoke();
