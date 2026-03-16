@@ -63,6 +63,13 @@ namespace Network
             base.OnStartNetwork();
             SceneManager.OnLoadEnd += Network_SceneManager_OnLoadEnd;
             SceneManager.OnUnloadEnd += Network_SceneManager_OnUnloadEnd;
+
+            foreach (var scene in SceneManager.SceneConnections.Keys)
+                if (!localNetworkedScenes.Contains(scene))
+                {
+                    Debug.Log($"Network Scene Manager: Found existing networked scene on start: {scene.name}");
+                    localNetworkedScenes.Add(scene);
+                }
         }
 
         public override void OnStopNetwork()
@@ -137,7 +144,7 @@ namespace Network
                 OnSceneLoadedForClient?.Invoke(scene, conn);
             }
 
-            Debug.Log($"Networked Scene Manager: Client {id} loaded networked scene: {sceneName}");
+            Debug.Log($"Network Scene Manager: Client {id} loaded networked scene: {sceneName}");
 
             var list = clientSceneLoaded[id];
             if (!list.Contains(sceneName))
@@ -148,7 +155,7 @@ namespace Network
 
             if (IsSceneLoadedOnAllClients(sceneName))
             {
-                Debug.Log($"Networked Scene Manager: All Clients have loaded networked scene: {sceneName}");
+                Debug.Log($"Network Scene Manager: All Clients have loaded networked scene: {sceneName}");
                 OnSceneLoadedForAllClients?.Invoke(scene);
             }
         }
@@ -163,7 +170,7 @@ namespace Network
             {
                 if (list.Remove(sceneName))
                 {
-                    Debug.Log($"Networked Scene Manager: Client {id} unloaded networked scene: {sceneName}");
+                    Debug.Log($"Network Scene Manager: Client {id} unloaded networked scene: {sceneName}");
                     clientSceneLoaded.Dirty(id);
                 }
             }
@@ -250,7 +257,7 @@ namespace Network
                     var list = kv.Value;
                     if (list == null || !list.Contains(sceneName))
                     {
-                        var warn = $"Networked Scene Manager: Scene {sceneName} not loaded on client: {kv.Key}. Scenes Loaded on client:";
+                        var warn = $"Network Scene Manager: Scene {sceneName} not loaded on client: {kv.Key}. Scenes Loaded on client:";
                         if (list != null)
                             for (int i = 0; i < list.Count; i++) warn += $"\n* {list[i]}";
                         Debug.LogWarning(warn);
@@ -322,7 +329,7 @@ namespace Network
                 var s = localNetworkedScenes[i];
                 if (s.IsValid() && s.isLoaded)
                 {
-                    Debug.Log($"Networked Scene Manager: Unloading local networked scene: {s.name}");
+                    Debug.Log($"Network Scene Manager: Unloading local networked scene: {s.name}");
                     UnitySceneManager.UnloadSceneAsync(s);
                 }
             }
@@ -335,13 +342,13 @@ namespace Network
             switch (op)
             {
                 case SyncListOperation.Add:
-                    Debug.Log($"Networked Scene Manager: Networked Scene Loaded on Server: {newItem}");
+                    Debug.Log($"Network Scene Manager: Networked Scene Loaded on Server: {newItem}");
                     break;
                 case SyncListOperation.RemoveAt:
-                    Debug.Log($"Networked Scene Manager: Networked Scene Unloaded on Server: {oldItem}");
+                    Debug.Log($"Network Scene Manager: Networked Scene Unloaded on Server: {oldItem}");
                     break;
                 case SyncListOperation.Clear:
-                    Debug.Log("Networked Scene Manager: All Networked Scenes Unloaded on Server");
+                    Debug.Log("Network Scene Manager: All Networked Scenes Unloaded on Server");
                     break;
             }
         }
@@ -398,7 +405,7 @@ namespace Network
 
             if (args.Added)
             {
-                Debug.Log($"Networked Scene Manager: Client {id} gained visibility in networked scene: {sceneName}");
+                Debug.Log($"Network Scene Manager: Client {id} gained visibility in networked scene: {sceneName}");
                 var list = clientSceneVisibilities[id];
                 if (!list.Contains(sceneName))
                 {
@@ -410,7 +417,7 @@ namespace Network
             }
             else
             {
-                Debug.Log($"Networked Scene Manager: Client {id} lost visibility in networked scene: {sceneName}");
+                Debug.Log($"Network Scene Manager: Client {id} lost visibility in networked scene: {sceneName}");
                 if (clientSceneVisibilities.TryGetValue(id, out var list))
                 {
                     if (list.Remove(sceneName))
@@ -420,7 +427,7 @@ namespace Network
 
             if (IsSceneVisibleToAllClients(sceneName))
             {
-                Debug.Log($"Networked Scene Manager: All Clients have visibility in networked scene: {sceneName}");
+                Debug.Log($"Network Scene Manager: All Clients have visibility in networked scene: {sceneName}");
                 OnSceneVisibleForAllClients?.Invoke(scene);
             }
         }
@@ -446,7 +453,7 @@ namespace Network
         {
             foreach (var scene in args.LoadedScenes)
             {
-                Debug.Log($"Networked Scene Manager: Local client loaded networked scene: {scene.name}");
+                Debug.Log($"Network Scene Manager: Local client loaded networked scene: {scene.name}");
                 RpcClientConfirmSceneLoaded(scene.name);
             }
         }
@@ -455,7 +462,7 @@ namespace Network
         {
             foreach (var unloaded in args.UnloadedScenesV2)
             {
-                Debug.Log($"Networked Scene Manager: Local client unloaded networked scene: {unloaded.Name}");
+                Debug.Log($"Network Scene Manager: Local client unloaded networked scene: {unloaded.Name}");
                 RpcClientSceneConfirmUnloaded(unloaded.Name);
             }
         }
