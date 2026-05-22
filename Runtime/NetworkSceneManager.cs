@@ -75,6 +75,12 @@ namespace Network
         public override void OnStopNetwork()
         {
             base.OnStopNetwork();
+            if (SceneManager != null)
+            {
+                SceneManager.OnLoadEnd -= Network_SceneManager_OnLoadEnd;
+                SceneManager.OnUnloadEnd -= Network_SceneManager_OnUnloadEnd;
+            }
+
             UnloadLocalNetworkedScenes();
         }
 
@@ -115,6 +121,14 @@ namespace Network
             SceneManager.OnUnloadEnd += Client_SceneManager_OnUnloadEnd;
 
             UnitySceneManager.sceneUnloaded += Client_UnitySceneManager_sceneUnloaded;
+
+            // Confirm pre-existing networked scenes to the server.
+            // localNetworkedScenes is already populated by OnStartNetwork which runs before this.
+            foreach (var scene in localNetworkedScenes)
+            {
+                Debug.Log($"Network Scene Manager: Local client confirming pre-existing networked scene: {scene.name}");
+                RpcClientConfirmSceneLoaded(scene.name);
+            }
         }
 
         public override void OnStopClient()
