@@ -56,7 +56,7 @@ namespace Network.UGS
             serverConnectionState = ConnectionState.Starting;
 
             var transportManager = InstanceFinder.TransportManager;
-            var transport = (FishyUnityTransport)transportManager?.GetTransport(transportIndex);
+            var transport = (UnityTransport)transportManager?.GetTransport(transportIndex);
 
             if (transport != null)
             {
@@ -121,7 +121,7 @@ namespace Network.UGS
             clientConnectionState = ConnectionState.Starting;
 
             var transportManager = InstanceFinder.TransportManager;
-            var transport = (FishyUnityTransport)transportManager?.GetTransport(transportIndex);
+            var transport = (UnityTransport)transportManager?.GetTransport(transportIndex);
 
             if (transport != null)
             {
