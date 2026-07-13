@@ -70,7 +70,7 @@ namespace Network.UGS
 
                 onJoinCodeReceived?.Invoke(joinCode.Value);
 
-                transport.SetRelayServerData(new Unity.Networking.Transport.Relay.RelayServerData(hostAllocation, "dtls"));
+                transport.SetRelayServerData(AllocationUtils.ToRelayServerData(hostAllocation, "dtls"));
 
                 transport.StartConnection(true);
 
@@ -135,7 +135,7 @@ namespace Network.UGS
                     JoinAllocation joinAllocation = await JoinAllocation(joinCode.Value);
                     if (ct.IsCancellationRequested) return;
 
-                    transport.SetRelayServerData(new Unity.Networking.Transport.Relay.RelayServerData(joinAllocation, "dtls"));
+                    transport.SetRelayServerData(AllocationUtils.ToRelayServerData(joinAllocation, "dtls"));
                 }
 
                 if (ct.IsCancellationRequested) return;
