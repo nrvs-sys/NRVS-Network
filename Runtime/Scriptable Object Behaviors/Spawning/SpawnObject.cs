@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using NRVS.Pool;
 
 [CreateAssetMenu(fileName = "Spawn Object_ New", menuName = "Behaviors/Spawning/Spawn Object")]
 public class SpawnObject : ScriptableObject 
@@ -62,14 +63,14 @@ public class SpawnObject : ScriptableObject
 		{
 			if (InstanceFinder.NetworkManager != null && InstanceFinder.NetworkManager.IsServerStarted)
 			{
-				spawnedObject = SimplePool.Spawn(prefab, position, rotation);
+				spawnedObject = ObjectPool.Spawn(prefab, position, rotation);
 
 				InstanceFinder.ServerManager.Spawn(spawnedObject, scene: spawnScene);
 			}
 		}
 		else
 		{
-			spawnedObject = SimplePool.Spawn(prefab, position, rotation);
+			spawnedObject = ObjectPool.Spawn(prefab, position, rotation);
 
 			if (spawnScene.IsValid())
                 SceneManager.MoveGameObjectToScene(spawnedObject, spawnScene);
